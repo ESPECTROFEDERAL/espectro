@@ -18,7 +18,6 @@ interface Challenge {
   solved: boolean;
 }
 
-// In production, store this in KV or D1 database
 const CHALLENGES: Challenge[] = [
   {
     id: "lookeecode",
@@ -132,21 +131,39 @@ const CHALLENGES: Challenge[] = [
   },
 ];
 
-// Store solved challenges per session (in production use KV)
-const solvedChallenges = new Map<string, Set<string>>();
+// Store user progress (in production, use KV or D1)
+interface UserProgress {
+  username: string;
+  solvedChallenges: Set<string>;
+  totalScore: number;
+  lastSolve: Date;
+}
 
-// Get session ID from request (simplified - use proper session management in production)
-function getSessionId(c: any): string {
-  return c.req.header("x-session-id") || "default-session";
+const userProgress = new Map<string, UserProgress>();
+
+function getUsername(c: any): string {
+  return c.req.header("x-username") || "anonymous";
+}
+
+function getUserProgress(username: string): UserProgress {
+  if (!userProgress.has(username)) {
+    userProgress.set(username, {
+      username,
+      solvedChallenges: new Set(),
+      totalScore: 0,
+      lastSolve: new Date(),
+    });
+  }
+  return userProgress.get(username)!;
 }
 
 app.get("/api/", (c) => {
-  return c.json({ name: "CTF Arena API" });
+  return c.json({ name: "CTF Arena API v2.0" });
 });
 
 app.get("/api/challenges", (c) => {
-  const sessionId = getSessionId(c);
-  const solved = solvedChallenges.get(sessionId) || new Set();
+  const username = getUsername(c);
+  const progress = getUserProgress(username);
 
   const challenges = CHALLENGES.map((ch) => ({
     id: ch.id,
@@ -156,22 +173,17 @@ app.get("/api/challenges", (c) => {
     points: ch.points,
     description: ch.description,
     hint: ch.hint,
-    solved: solved.has(ch.id),
+    solved: progress.solvedChallenges.has(ch.id),
   }));
-
-  const totalScore = Array.from(solved).reduce((sum, id) => {
-    const challenge = CHALLENGES.find((c) => c.id === id);
-    return sum + (challenge?.points || 0);
-  }, 0);
 
   return c.json({
     challenges,
-    totalScore,
+    totalScore: progress.totalScore,
   });
 });
 
 app.post("/api/submit", async (c) => {
-  const sessionId = getSessionId(c);
+  const username = getUsername(c);
   const { challengeId, flag } = await c.req.json();
 
   if (!challengeId || !flag) {
@@ -190,9 +202,10 @@ app.post("/api/submit", async (c) => {
     }, 404);
   }
 
+  const progress = getUserProgress(username);
+
   // Check if already solved
-  const solved = solvedChallenges.get(sessionId) || new Set();
-  if (solved.has(challengeId)) {
+  if (progress.solvedChallenges.has(challengeId)) {
     return c.json({
       correct: false,
       message: "You've already solved this challenge!",
@@ -201,8 +214,9 @@ app.post("/api/submit", async (c) => {
 
   // Validate flag (case-insensitive)
   if (flag.toLowerCase().trim() === challenge.flag.toLowerCase()) {
-    solved.add(challengeId);
-    solvedChallenges.set(sessionId, solved);
+    progress.solvedChallenges.add(challengeId);
+    progress.totalScore += challenge.points;
+    progress.lastSolve = new Date();
 
     return c.json({
       correct: true,
@@ -218,24 +232,33 @@ app.post("/api/submit", async (c) => {
 });
 
 app.get("/api/leaderboard", (c) => {
-  // In production, fetch from database
-  const scores = Array.from(solvedChallenges.entries()).map(([session, solved]) => {
-    const totalScore = Array.from(solved).reduce((sum, id) => {
-      const challenge = CHALLENGES.find((c) => c.id === id);
-      return sum + (challenge?.points || 0);
-    }, 0);
+  const currentUsername = getUsername(c);
+  
+  // Convert to array and sort by score
+  const leaderboard = Array.from(userProgress.values())
+    .map(user => ({
+      username: user.username,
+      score: user.totalScore,
+      challengesSolved: user.solvedChallenges.size,
+      lastSolved: user.lastSolve.toISOString(),
+    }))
+    .sort((a, b) => b.score - a.score || b.challengesSolved - a.challengesSolved);
 
-    return {
-      session: session.substring(0, 8), // Show only first 8 chars
-      score: totalScore,
-      challengesSolved: solved.size,
-    };
-  });
-
-  scores.sort((a, b) => b.score - a.score);
+  // Find current user's rank
+  const userRank = leaderboard.findIndex(u => u.username === currentUsername) + 1;
+  
+  const userStats = {
+    username: currentUsername,
+    score: getUserProgress(currentUsername).totalScore,
+    rank: userRank || 0,
+    totalPlayers: leaderboard.length,
+    challengesSolved: getUserProgress(currentUsername).solvedChallenges.size,
+    recentSolves: [],
+  };
 
   return c.json({
-    leaderboard: scores.slice(0, 10), // Top 10
+    leaderboard: leaderboard.slice(0, 20), // Top 20
+    userStats,
   });
 });
 
@@ -249,6 +272,34 @@ app.get("/api/hint/:challengeId", (c) => {
 
   return c.json({
     hint: challenge.hint || "No hint available",
+  });
+});
+
+app.get("/api/stats", (c) => {
+  const totalUsers = userProgress.size;
+  const totalSubmissions = Array.from(userProgress.values()).reduce(
+    (sum, user) => sum + user.solvedChallenges.size,
+    0
+  );
+
+  const challengeStats = CHALLENGES.map(ch => {
+    const solveCount = Array.from(userProgress.values()).filter(
+      u => u.solvedChallenges.has(ch.id)
+    ).length;
+    
+    return {
+      id: ch.id,
+      title: ch.title,
+      solves: solveCount,
+      solveRate: totalUsers > 0 ? (solveCount / totalUsers) * 100 : 0,
+    };
+  });
+
+  return c.json({
+    totalUsers,
+    totalChallenges: CHALLENGES.length,
+    totalSubmissions,
+    challengeStats,
   });
 });
 
