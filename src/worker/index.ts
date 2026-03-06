@@ -1,306 +1,236 @@
-// worker/index.ts
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-
-const app = new Hono();
-
-app.use("/*", cors());
-
-interface Challenge {
-  id: string;
-  title: string;
-  category: "crypto" | "forensics" | "web" | "misc";
-  difficulty: "easy" | "medium" | "hard";
-  points: number;
-  description: string;
-  hint?: string;
-  flag: string;
-  solved: boolean;
-}
-
 const CHALLENGES: Challenge[] = [
+  // ================== CRYPTO ==================
   {
-    id: "lookeecode",
-    title: "Look E Code",
+    id: "rot13-1",
+    title: "ROT13 Starter",
     category: "crypto",
     difficulty: "easy",
+    points: 50,
+    description: "Uryyb jbeyq!\n\nDecode this ROT13 text.\n\nFlag format: flag{decoded_text}",
+    hint: "ROT13 shifts letters by 13 positions in the alphabet.",
+    flag: "flag{hello_world}",
+    solved: false,
+  },
+  {
+    id: "base64-1",
+    title: "Base64 Easy",
+    category: "crypto",
+    difficulty: "easy",
+    points: 50,
+    description: "SGVsbG8gQ1RGLA==\n\nDecode this Base64 string.\n\nFlag format: flag{...}",
+    hint: "Use any Base64 decoder.",
+    flag: "flag{hello_ctf}",
+    solved: false,
+  },
+  {
+    id: "hex-1",
+    title: "Hex to Text",
+    category: "crypto",
+    difficulty: "easy",
+    points: 50,
+    description: "48656c6c6f2c2043544621\n\nConvert this hex string to ASCII.\n\nFlag format: flag{...}",
+    hint: "Each 2 hex digits represent one ASCII character.",
+    flag: "flag{hello_ctf}",
+    solved: false,
+  },
+  {
+    id: "morse-1",
+    title: "Morse Code",
+    category: "crypto",
+    difficulty: "easy",
+    points: 50,
+    description: "... --- ...\n\nDecode this Morse code.\n\nFlag format: flag{...}",
+    hint: "SOS in Morse code is ... --- ...",
+    flag: "flag{sos}",
+    solved: false,
+  },
+  {
+    id: "rot47-1",
+    title: "ROT47",
+    category: "crypto",
+    difficulty: "medium",
     points: 100,
-    description: "We intercepted this mysterious image with geometric symbols. Can you decode the hidden message?\n\nFlag format: flag{decoded_message}",
-    hint: "The shapes look like parts of letters! Try matching them visually.",
-    flag: "flag{lookeecode}",
+    description: "w6==@/ @?p\n\nDecode this using ROT47.\n\nFlag format: flag{...}",
+    hint: "ROT47 shifts ASCII characters between 33 and 126 by 47.",
+    flag: "flag{rot47_success}",
     solved: false,
   },
   {
-    id: "web-basics",
-    title: "Hidden in Plain Sight",
-    category: "web",
-    difficulty: "easy",
-    points: 50,
-    description: "Sometimes the answer is right in front of you. Check the source!\n\nFlag format: flag{...}",
-    hint: "Inspect the HTML source code of this page. Look for HTML comments.",
-    flag: "flag{inspect_the_source_code}",
+    id: "binary-1",
+    title: "Binary Decoder",
+    category: "crypto",
+    difficulty: "medium",
+    points: 100,
+    description: "01100110 01101100 01100001 01100111\n\nConvert this binary to text.\n\nFlag format: flag{...}",
+    hint: "8-bit binary to ASCII.",
+    flag: "flag{flag}",
     solved: false,
   },
   {
-    id: "stego-101",
-    title: "Image Secrets",
-    category: "forensics",
+    id: "vigenere-1",
+    title: "Vigenere Cipher",
+    category: "crypto",
     difficulty: "medium",
     points: 150,
-    description: "This image file seems normal, but is it? There's more than meets the eye.\n\nFlag format: flag{...}",
-    hint: "Try checking the metadata or running strings on the file.",
-    flag: "flag{hidden_in_metadata}",
+    description: "Ciphertext: LXFOPVEFRNHR\nKey: LEMON\n\nDecrypt this Vigenere cipher.\n\nFlag format: flag{...}",
+    hint: "Vigenere uses the key to shift letters.",
+    flag: "flag{attackatdawn}",
     solved: false,
   },
   {
-    id: "rot13-mix",
-    title: "Classic Cipher",
-    category: "crypto",
-    difficulty: "easy",
-    points: 75,
-    description: "synt{pelcgb_vf_sha}\n\nWhat does this mean?\n\nFlag format: flag{...}",
-    hint: "ROT13 is a classic substitution cipher. Each letter is replaced by the letter 13 positions after it.",
-    flag: "flag{crypto_is_fun}",
-    solved: false,
-  },
-  {
-    id: "base64-puzzle",
-    title: "Encoded Message",
-    category: "crypto",
-    difficulty: "easy",
-    points: 75,
-    description: "ZmxhZ3tkZWNvZGVfdGhlX2Jhc2U2NH0=\n\nDecode this message!\n\nFlag format: flag{...}",
-    hint: "This looks like Base64 encoding. Try decoding it!",
-    flag: "flag{decode_the_base64}",
-    solved: false,
-  },
-  {
-    id: "jwt-secret",
-    title: "Token Hunter",
-    category: "web",
-    difficulty: "medium",
-    points: 200,
-    description: "We found this JWT token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmbGFnIjoiZmxhZ3tqd3RfaXNfbm90X3NlY3VyZX0iLCJpYXQiOjE1MTYyMzkwMjJ9.8jXKx_YLVgTqZ9b_CqZ8f9J9xQZ_QwZ8xZ9\n\nWhat's hidden inside?\n\nFlag format: flag{...}",
-    hint: "JWT tokens have 3 parts separated by dots. The payload is Base64 encoded!",
-    flag: "flag{jwt_is_not_secure}",
-    solved: false,
-  },
-  {
-    id: "sql-injection",
-    title: "Database Breach",
-    category: "web",
-    difficulty: "hard",
-    points: 300,
-    description: "Find the SQL injection vulnerability and extract the flag.\n\nQuery: SELECT * FROM users WHERE username = 'INPUT'\n\nFlag format: flag{...}",
-    hint: "Try classic SQL injection: ' OR '1'='1",
-    flag: "flag{sql_injection_success}",
-    solved: false,
-  },
-  {
-    id: "morse-code",
-    title: "Dit Dah Dit",
+    id: "caesar-2",
+    title: "Caesar Shift",
     category: "crypto",
     difficulty: "easy",
     points: 50,
-    description: "..-. .-.. .- --. -.--..-- -- --- .-. ... . -..-. .. ... -..-. -.-. --- --- .-.. -.--.-\n\nWhat does this say?\n\nFlag format: flag{...}",
-    hint: "This is Morse code! Use a decoder or translate manually.",
-    flag: "flag{morse_is_cool}",
+    description: "Khoor Zruog\n\nThis is a Caesar cipher with unknown shift.\n\nFlag format: flag{...}",
+    hint: "Try shifting letters until it makes sense.",
+    flag: "flag{hello_world}",
     solved: false,
   },
   {
-    id: "reverse-engineering",
-    title: "Binary Mystery",
+    id: "base32-1",
+    title: "Base32 Fun",
+    category: "crypto",
+    difficulty: "medium",
+    points: 100,
+    description: "JBSWY3DPEBLW64TMMQQQ====\n\nDecode this Base32 string.\n\nFlag format: flag{...}",
+    hint: "Use any Base32 decoder.",
+    flag: "flag{base32_decoded}",
+    solved: false,
+  },
+  {
+    id: "atbash-1",
+    title: "Atbash Cipher",
+    category: "crypto",
+    difficulty: "easy",
+    points: 50,
+    description: "Zgyzhs rh z hvxivg\n\nDecrypt this using Atbash.\n\nFlag format: flag{...}",
+    hint: "Atbash reverses the alphabet: A->Z, B->Y ...",
+    flag: "flag{attack_is_a_secret}",
+    solved: false,
+  },
+  // ================== OSINT ==================
+  {
+    id: "osint-twitter",
+    title: "Twitter Hunt",
+    category: "web",
+    difficulty: "easy",
+    points: 50,
+    description: "A tweet contains a hidden flag. Check the tweet's source or media.\n\nFlag format: flag{...}",
+    hint: "Sometimes the flag is in images or links.",
+    flag: "flag{hidden_in_tweet}",
+    solved: false,
+  },
+  {
+    id: "osint-linkedin",
+    title: "LinkedIn Clues",
+    category: "web",
+    difficulty: "medium",
+    points: 100,
+    description: "Check the user's profile for a secret code.\n\nFlag format: flag{...}",
+    hint: "Look at job titles, past projects, or encoded URLs.",
+    flag: "flag{linkedin_secret}",
+    solved: false,
+  },
+  {
+    id: "osint-image-meta",
+    title: "Image Metadata",
+    category: "web",
+    difficulty: "medium",
+    points: 100,
+    description: "This image might contain hidden information in its metadata.\n\nFlag format: flag{...}",
+    hint: "Check EXIF data or hidden comments.",
+    flag: "flag{metadata_found}",
+    solved: false,
+  },
+  {
+    id: "osint-domain",
+    title: "Domain Info",
+    category: "web",
+    difficulty: "easy",
+    points: 50,
+    description: "Who owns the domain example.com?\n\nFlag format: flag{...}",
+    hint: "Use WHOIS lookup services.",
+    flag: "flag{domain_owner}",
+    solved: false,
+  },
+  {
+    id: "osint-google-dork",
+    title: "Google Dorking",
+    category: "web",
+    difficulty: "medium",
+    points: 100,
+    description: "Use a Google dork to find the hidden page.\n\nFlag format: flag{...}",
+    hint: "Look for filetype or inurl operators.",
+    flag: "flag{hidden_google_page}",
+    solved: false,
+  },
+  {
+    id: "osint-social-hidden",
+    title: "Social Clues",
+    category: "web",
+    difficulty: "medium",
+    points: 100,
+    description: "A social media post has hidden info in the source.\n\nFlag format: flag{...}",
+    hint: "Check HTML comments and source code.",
+    flag: "flag{social_hidden}",
+    solved: false,
+  },
+  // ================== MISC ==================
+  {
+    id: "misc-riddle-1",
+    title: "Riddle Me This",
     category: "misc",
-    difficulty: "hard",
-    points: 250,
-    description: "01100110 01101100 01100001 01100111 01111011 01100010 01101001 01101110 01100001 01110010 01111001 01011111 01101001 01110011 01011111 01100101 01100001 01110011 01111001 01111101\n\nDecode the binary!\n\nFlag format: flag{...}",
-    hint: "Binary to ASCII conversion. Each 8-bit sequence is one character.",
-    flag: "flag{binary_is_easy}",
+    difficulty: "easy",
+    points: 50,
+    description: "I speak without a mouth and hear without ears. What am I?\n\nFlag format: flag{...}",
+    hint: "Think about non-living objects.",
+    flag: "flag{echo}",
     solved: false,
   },
   {
-    id: "xor-cipher",
-    title: "XOR Challenge",
-    category: "crypto",
+    id: "misc-anagram-1",
+    title: "Anagram Fun",
+    category: "misc",
+    difficulty: "easy",
+    points: 50,
+    description: "Unscramble: CTFRAEN\n\nFlag format: flag{...}",
+    hint: "Rearrange the letters.",
+    flag: "flag{ctfaren}",
+    solved: false,
+  },
+  {
+    id: "misc-math-1",
+    title: "Math Puzzle",
+    category: "misc",
     difficulty: "medium",
-    points: 150,
-    description: "Encrypted hex: 0e33172e172a331d172e172c331a172e\nKey: CTF\n\nXOR the hex with the key to get the flag!\n\nFlag format: flag{...}",
-    hint: "XOR each byte of the encrypted hex with the repeating key 'CTF'.",
-    flag: "flag{xor_crypto}",
+    points: 100,
+    description: "If 2+3=10, 3+4=21, then 5+6=?\n\nFlag format: flag{...}",
+    hint: "It's not normal arithmetic. Think pattern.",
+    flag: "flag{55}",
+    solved: false,
+  },
+  {
+    id: "misc-ascii-1",
+    title: "ASCII Art",
+    category: "misc",
+    difficulty: "easy",
+    points: 50,
+    description: "Look at this ASCII art: (•_•)\n\nFlag format: flag{...}",
+    hint: "Flag hidden visually.",
+    flag: "flag{ascii_face}",
+    solved: false,
+  },
+  {
+    id: "misc-puzzle-1",
+    title: "Simple Puzzle",
+    category: "misc",
+    difficulty: "medium",
+    points: 100,
+    description: "Rearrange letters: EHPFALG\n\nFlag format: flag{...}",
+    hint: "It's an anagram of 'FLAG'.",
+    flag: "flag{flagphe}",
     solved: false,
   },
 ];
-
-// Store user progress (in production, use KV or D1)
-interface UserProgress {
-  username: string;
-  solvedChallenges: Set<string>;
-  totalScore: number;
-  lastSolve: Date;
-}
-
-const userProgress = new Map<string, UserProgress>();
-
-function getUsername(c: any): string {
-  return c.req.header("x-username") || "anonymous";
-}
-
-function getUserProgress(username: string): UserProgress {
-  if (!userProgress.has(username)) {
-    userProgress.set(username, {
-      username,
-      solvedChallenges: new Set(),
-      totalScore: 0,
-      lastSolve: new Date(),
-    });
-  }
-  return userProgress.get(username)!;
-}
-
-app.get("/api/", (c) => {
-  return c.json({ name: "CTF Arena API v2.0" });
-});
-
-app.get("/api/challenges", (c) => {
-  const username = getUsername(c);
-  const progress = getUserProgress(username);
-
-  const challenges = CHALLENGES.map((ch) => ({
-    id: ch.id,
-    title: ch.title,
-    category: ch.category,
-    difficulty: ch.difficulty,
-    points: ch.points,
-    description: ch.description,
-    hint: ch.hint,
-    solved: progress.solvedChallenges.has(ch.id),
-  }));
-
-  return c.json({
-    challenges,
-    totalScore: progress.totalScore,
-  });
-});
-
-app.post("/api/submit", async (c) => {
-  const username = getUsername(c);
-  const { challengeId, flag } = await c.req.json();
-
-  if (!challengeId || !flag) {
-    return c.json({
-      correct: false,
-      message: "Missing challenge ID or flag",
-    }, 400);
-  }
-
-  const challenge = CHALLENGES.find((ch) => ch.id === challengeId);
-
-  if (!challenge) {
-    return c.json({
-      correct: false,
-      message: "Challenge not found",
-    }, 404);
-  }
-
-  const progress = getUserProgress(username);
-
-  // Check if already solved
-  if (progress.solvedChallenges.has(challengeId)) {
-    return c.json({
-      correct: false,
-      message: "You've already solved this challenge!",
-    });
-  }
-
-  // Validate flag (case-insensitive)
-  if (flag.toLowerCase().trim() === challenge.flag.toLowerCase()) {
-    progress.solvedChallenges.add(challengeId);
-    progress.totalScore += challenge.points;
-    progress.lastSolve = new Date();
-
-    return c.json({
-      correct: true,
-      message: `🎉 Correct! You earned ${challenge.points} points!`,
-      points: challenge.points,
-    });
-  }
-
-  return c.json({
-    correct: false,
-    message: "❌ Incorrect flag. Try again!",
-  });
-});
-
-app.get("/api/leaderboard", (c) => {
-  const currentUsername = getUsername(c);
-  
-  // Convert to array and sort by score
-  const leaderboard = Array.from(userProgress.values())
-    .map(user => ({
-      username: user.username,
-      score: user.totalScore,
-      challengesSolved: user.solvedChallenges.size,
-      lastSolved: user.lastSolve.toISOString(),
-    }))
-    .sort((a, b) => b.score - a.score || b.challengesSolved - a.challengesSolved);
-
-  // Find current user's rank
-  const userRank = leaderboard.findIndex(u => u.username === currentUsername) + 1;
-  
-  const userStats = {
-    username: currentUsername,
-    score: getUserProgress(currentUsername).totalScore,
-    rank: userRank || 0,
-    totalPlayers: leaderboard.length,
-    challengesSolved: getUserProgress(currentUsername).solvedChallenges.size,
-    recentSolves: [],
-  };
-
-  return c.json({
-    leaderboard: leaderboard.slice(0, 20), // Top 20
-    userStats,
-  });
-});
-
-app.get("/api/hint/:challengeId", (c) => {
-  const challengeId = c.req.param("challengeId");
-  const challenge = CHALLENGES.find((ch) => ch.id === challengeId);
-
-  if (!challenge) {
-    return c.json({ error: "Challenge not found" }, 404);
-  }
-
-  return c.json({
-    hint: challenge.hint || "No hint available",
-  });
-});
-
-app.get("/api/stats", (c) => {
-  const totalUsers = userProgress.size;
-  const totalSubmissions = Array.from(userProgress.values()).reduce(
-    (sum, user) => sum + user.solvedChallenges.size,
-    0
-  );
-
-  const challengeStats = CHALLENGES.map(ch => {
-    const solveCount = Array.from(userProgress.values()).filter(
-      u => u.solvedChallenges.has(ch.id)
-    ).length;
-    
-    return {
-      id: ch.id,
-      title: ch.title,
-      solves: solveCount,
-      solveRate: totalUsers > 0 ? (solveCount / totalUsers) * 100 : 0,
-    };
-  });
-
-  return c.json({
-    totalUsers,
-    totalChallenges: CHALLENGES.length,
-    totalSubmissions,
-    challengeStats,
-  });
-});
-
-export default app;
