@@ -1,8 +1,1 @@
-{
-	"files": [],
-	"references": [
-		{ "path": "./tsconfig.app.json" },
-		{ "path": "./tsconfig.node.json" },
-		{ "path": "./tsconfig.worker.json" }
-	]
-}
+{\n  "compilerOptions": {\n    "target": "ESNext",\n    "module": "ESNext",\n    "lib": [\n      "DOM",\n      "ESNext"\n    ],\n    "strict": true,\n    "esModuleInterop": true,\n    "skipLibCheck": true,\n    "forceConsistentCasingInFileNames": true,\n    "outDir": "./dist",\n    "moduleResolution": "Node"\n  },\n  "include": [\n    "./src/**/*"\n  ],\n  "exclude": [\n    "node_modules",\n    "dist"\n  ]\n}
