@@ -19,7 +19,29 @@ interface SubmitResponse {
   points?: number;
 }
 
+interface LeaderboardEntry {
+  username: string;
+  score: number;
+  challengesSolved: number;
+  lastSolved?: string;
+}
+
+interface UserStats {
+  username: string;
+  score: number;
+  rank: number;
+  totalPlayers: number;
+  challengesSolved: number;
+  recentSolves: string[];
+}
+
 function App() {
+  // Auth state
+  const [username, setUsername] = useState<string>("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
+  
+  // Challenge state
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [flagInput, setFlagInput] = useState("");
@@ -27,22 +49,74 @@ function App() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Dashboard state
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
-    // Fetch challenges from API
-    fetch("/api/challenges")
-      .then((res) => res.json())
-      .then((data) => {
-        setChallenges(data.challenges || []);
-        setTotalScore(data.totalScore || 0);
-        setLoading(false);
-      })
-      .catch(() => {
-        // Fallback to demo data if API not ready
-        setChallenges(DEMO_CHALLENGES);
-        setLoading(false);
-      });
+    // Check for stored username
+    const stored = localStorage.getItem("ctf_username");
+    if (stored) {
+      setUsername(stored);
+      setIsLoggedIn(true);
+      loadUserData(stored);
+    } else {
+      setLoading(false);
+    }
   }, []);
+
+  const loadUserData = async (user: string) => {
+    try {
+      const res = await fetch("/api/challenges", {
+        headers: { "x-username": user },
+      });
+      const data = await res.json();
+      setChallenges(data.challenges || []);
+      setTotalScore(data.totalScore || 0);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+    }
+  };
+
+  const loadLeaderboard = async () => {
+    try {
+      const res = await fetch("/api/leaderboard", {
+        headers: { "x-username": username },
+      });
+      const data = await res.json();
+      setLeaderboard(data.leaderboard || []);
+      setUserStats(data.userStats || null);
+    } catch (error) {
+      console.error("Failed to load leaderboard");
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!usernameInput.trim() || usernameInput.length < 3) {
+      alert("Username must be at least 3 characters!");
+      return;
+    }
+
+    const user = usernameInput.trim();
+    localStorage.setItem("ctf_username", user);
+    setUsername(user);
+    setIsLoggedIn(true);
+    
+    await loadUserData(user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("ctf_username");
+    setUsername("");
+    setIsLoggedIn(false);
+    setChallenges([]);
+    setTotalScore(0);
+    setSelectedChallenge(null);
+    setShowDashboard(false);
+  };
 
   const submitFlag = async () => {
     if (!selectedChallenge || !flagInput.trim()) return;
@@ -52,7 +126,10 @@ function App() {
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-username": username,
+        },
         body: JSON.stringify({
           challengeId: selectedChallenge.id,
           flag: flagInput.trim(),
@@ -76,18 +153,7 @@ function App() {
         setFeedback({ type: "error", message: data.message });
       }
     } catch (error) {
-      // Demo mode validation
-      if (selectedChallenge.id === "lookeecode" && flagInput.toLowerCase() === "flag{lookeecode}") {
-        setFeedback({ type: "success", message: "🎉 Correct! You decoded the cipher!" });
-        setChallenges(prev =>
-          prev.map(c => c.id === selectedChallenge.id ? { ...c, solved: true } : c)
-        );
-        setTotalScore(prev => prev + selectedChallenge.points);
-        setSelectedChallenge({ ...selectedChallenge, solved: true });
-        setFlagInput("");
-      } else {
-        setFeedback({ type: "error", message: "❌ Incorrect flag. Try again!" });
-      }
+      setFeedback({ type: "error", message: "Failed to submit flag" });
     }
   };
 
@@ -110,6 +176,63 @@ function App() {
     return colors[difficulty as keyof typeof colors] || "#888";
   };
 
+  // Login Screen
+  if (!isLoggedIn) {
+    return (
+      <div className="login-screen">
+        <div className="login-container">
+          <div className="login-header">
+            <h1 className="login-title">
+              <span className="bracket">{'>'}</span>
+              <span className="title-text">CTF_ARENA</span>
+              <span className="cursor-blink">_</span>
+            </h1>
+            <p className="login-subtitle">CAPTURE THE FLAG CHALLENGE PLATFORM</p>
+          </div>
+
+          <div className="login-box">
+            <div className="terminal-window">
+              <div className="terminal-header">
+                <span className="terminal-button red"></span>
+                <span className="terminal-button yellow"></span>
+                <span className="terminal-button green"></span>
+              </div>
+              <div className="terminal-body">
+                <p className="terminal-text">$ ACCESS REQUIRED</p>
+                <p className="terminal-text">$ ENTER USERNAME TO CONTINUE...</p>
+              </div>
+            </div>
+
+            <div className="login-form">
+              <label htmlFor="username" className="login-label">
+                USERNAME:
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+                placeholder="hacker123"
+                className="login-input"
+                autoFocus
+              />
+              <button onClick={handleLogin} className="login-button">
+                ENTER ARENA →
+              </button>
+            </div>
+
+            <div className="login-info">
+              <p>🎯 Solve challenges to earn points</p>
+              <p>🏆 Compete on the global leaderboard</p>
+              <p>🚩 10 challenges across 4 categories</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="app">
@@ -120,6 +243,154 @@ function App() {
     );
   }
 
+  // Dashboard View
+  if (showDashboard) {
+    return (
+      <div className="app">
+        <header className="header">
+          <div className="header-content">
+            <h1 className="title">
+              <span className="bracket">{'>'}</span>
+              <span className="title-text">DASHBOARD</span>
+            </h1>
+            <div className="header-actions">
+              <button onClick={() => setShowDashboard(false)} className="nav-button">
+                ← CHALLENGES
+              </button>
+              <button onClick={handleLogout} className="logout-button">
+                LOGOUT
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="dashboard-container">
+          <div className="user-stats-card">
+            <h2 className="stats-title">
+              <span className="terminal-prompt">$</span> PLAYER STATS
+            </h2>
+            <div className="stats-grid">
+              <div className="stat-item">
+                <div className="stat-label">USERNAME</div>
+                <div className="stat-value username-display">@{username}</div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-label">TOTAL SCORE</div>
+                <div className="stat-value score-highlight">{totalScore}</div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-label">RANK</div>
+                <div className="stat-value rank-display">
+                  {userStats?.rank || "—"} / {userStats?.totalPlayers || "—"}
+                </div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-label">SOLVED</div>
+                <div className="stat-value">{challenges.filter(c => c.solved).length} / {challenges.length}</div>
+              </div>
+            </div>
+
+            <div className="progress-section">
+              <div className="progress-label">COMPLETION PROGRESS</div>
+              <div className="progress-bar">
+                <div 
+                  className="progress-fill" 
+                  style={{ 
+                    width: `${(challenges.filter(c => c.solved).length / challenges.length) * 100}%` 
+                  }}
+                ></div>
+              </div>
+              <div className="progress-text">
+                {Math.round((challenges.filter(c => c.solved).length / challenges.length) * 100)}%
+              </div>
+            </div>
+          </div>
+
+          <div className="leaderboard-card">
+            <div className="leaderboard-header">
+              <h2 className="stats-title">
+                <span className="terminal-prompt">$</span> GLOBAL LEADERBOARD
+              </h2>
+              <button onClick={loadLeaderboard} className="refresh-button">
+                ↻ REFRESH
+              </button>
+            </div>
+
+            <div className="leaderboard-table">
+              <div className="leaderboard-header-row">
+                <div className="rank-col">RANK</div>
+                <div className="name-col">PLAYER</div>
+                <div className="score-col">SCORE</div>
+                <div className="solved-col">SOLVED</div>
+              </div>
+              
+              {leaderboard.length > 0 ? (
+                leaderboard.map((entry, index) => (
+                  <div 
+                    key={entry.username} 
+                    className={`leaderboard-row ${entry.username === username ? "current-user" : ""} ${index < 3 ? `top-${index + 1}` : ""}`}
+                  >
+                    <div className="rank-col">
+                      {index === 0 && "🥇"}
+                      {index === 1 && "🥈"}
+                      {index === 2 && "🥉"}
+                      {index > 2 && `#${index + 1}`}
+                    </div>
+                    <div className="name-col">
+                      {entry.username}
+                      {entry.username === username && <span className="you-badge">YOU</span>}
+                    </div>
+                    <div className="score-col">{entry.score}</div>
+                    <div className="solved-col">{entry.challengesSolved}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="no-data">
+                  <p>No leaderboard data yet. Click REFRESH to load!</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="category-stats-card">
+            <h2 className="stats-title">
+              <span className="terminal-prompt">$</span> CATEGORY BREAKDOWN
+            </h2>
+            <div className="category-grid">
+              {["crypto", "forensics", "web", "misc"].map(category => {
+                const categoryChalls = challenges.filter(c => c.category === category);
+                const solved = categoryChalls.filter(c => c.solved).length;
+                const total = categoryChalls.length;
+                const percentage = total > 0 ? (solved / total) * 100 : 0;
+
+                return (
+                  <div key={category} className="category-stat-item">
+                    <div className="category-name" style={{ color: getCategoryColor(category) }}>
+                      {category.toUpperCase()}
+                    </div>
+                    <div className="category-progress">
+                      <div className="mini-progress-bar">
+                        <div 
+                          className="mini-progress-fill" 
+                          style={{ 
+                            width: `${percentage}%`,
+                            backgroundColor: getCategoryColor(category)
+                          }}
+                        ></div>
+                      </div>
+                      <span className="category-count">{solved}/{total}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Challenge View (continued in next message due to length)
   return (
     <div className="app">
       <header className="header">
@@ -129,9 +400,14 @@ function App() {
             <span className="title-text">CTF_ARENA</span>
             <span className="cursor-blink">_</span>
           </h1>
-          <div className="score-display">
-            <span className="score-label">SCORE:</span>
-            <span className="score-value">{totalScore}</span>
+          <div className="header-right">
+            <div className="user-info">
+              <span className="username-badge">@{username}</span>
+            </div>
+            <div className="score-display">
+              <span className="score-label">SCORE:</span>
+              <span className="score-value">{totalScore}</span>
+            </div>
           </div>
         </div>
         <div className="stats-bar">
@@ -146,6 +422,17 @@ function App() {
           <div className="stat">
             <span className="stat-label">REMAINING:</span>
             <span className="stat-value">{challenges.filter(c => !c.solved).length}</span>
+          </div>
+          <div className="stat-actions">
+            <button onClick={() => {
+              loadLeaderboard();
+              setShowDashboard(true);
+            }} className="dashboard-button">
+              📊 DASHBOARD
+            </button>
+            <button onClick={handleLogout} className="logout-mini-button">
+              LOGOUT
+            </button>
           </div>
         </div>
       </header>
@@ -298,49 +585,5 @@ function App() {
     </div>
   );
 }
-
-// Demo challenges (fallback if API not ready)
-const DEMO_CHALLENGES: Challenge[] = [
-  {
-    id: "lookeecode",
-    title: "Look E Code",
-    category: "crypto",
-    difficulty: "easy",
-    points: 100,
-    description: "We intercepted this mysterious image with geometric symbols. Can you decode the hidden message?\n\nFlag format: flag{decoded_message}",
-    hint: "The shapes look like parts of letters! Try matching them visually.",
-    solved: false,
-  },
-  {
-    id: "web-basics",
-    title: "Hidden in Plain Sight",
-    category: "web",
-    difficulty: "easy",
-    points: 50,
-    description: "Sometimes the answer is right in front of you. Check the source!\n\nFlag format: flag{...}",
-    hint: "Inspect the HTML source code of this page. Look for HTML comments.",
-    solved: false,
-  },
-  {
-    id: "stego-101",
-    title: "Image Secrets",
-    category: "forensics",
-    difficulty: "medium",
-    points: 150,
-    description: "This image file seems normal, but is it? There's more than meets the eye.\n\nFlag format: flag{...}",
-    hint: "Try checking the metadata or running strings on the file.",
-    solved: false,
-  },
-  {
-    id: "rot13-mix",
-    title: "Classic Cipher",
-    category: "crypto",
-    difficulty: "easy",
-    points: 75,
-    description: "synt{pelcgb_vf_sha}\n\nWhat does this mean?\n\nFlag format: flag{...}",
-    hint: "ROT13 is a classic substitution cipher. Each letter is replaced by the letter 13 positions after it.",
-    solved: false,
-  },
-];
 
 export default App;
